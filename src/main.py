@@ -23,7 +23,7 @@ from sklearn.metrics import confusion_matrix
 import warnings
 warnings.filterwarnings('once')
 
-datos = pd.read_csv('../carseats.csv')
+datos = pd.read_csv('carseats.csv')
 print(datos.head(3))
 
 datos['ventas_altas'] = np.where(datos.Sales > 8, 0, 1)
@@ -153,3 +153,5 @@ importancia_predictores = pd.DataFrame(
 'importancia': modelo_final.feature_importances_}
 )
 importancia_predictores.sort_values('importancia', ascending=False)
+
+print(importancia_predictores)
