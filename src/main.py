@@ -32,9 +32,9 @@ datos = datos.drop(columns = 'Sales')
 # División de los datos en train y test
 # ------------------------------------------------------------------------------
 X_train, X_test, y_train, y_test = train_test_split(
-datos.drop(columns = 'ventas_altas'),
-datos['ventas_altas'],
-random_state = 123
+    datos.drop(columns = 'ventas_altas'), # Primer argumento de Arrays*
+    datos['ventas_altas'],                # Segundo argumento de Arrays*
+    random_state = 123
 )
 # One-hot-encoding de las variables categóricas
 # ------------------------------------------------------------------------------
@@ -44,19 +44,28 @@ numeric_cols = X_train.select_dtypes(include=['float64', 'int']).columns.to_list
 # Se aplica one-hot-encoding solo a las columnas categóricas
 preprocessor = ColumnTransformer(
 [('onehot', OneHotEncoder(handle_unknown='ignore'), cat_cols)],
-remainder='passthrough'
+remainder='passthrough'  
 )
+# remainder='passthrough'
+# Mantiene las columnas no
+# transformadas (en este caso, las
+# numéricas) tal como están.
+
+
 # Una vez que se ha definido el objeto ColumnTransformer, con el método fit()
 # se aprenden las transformaciones con los datos de entrenamiento y se aplican a
 # los dos conjuntos con transform(). Ambas operaciones a la vez con fit_transform().
 X_train_prep = preprocessor.fit_transform(X_train)
 X_test_prep = preprocessor.transform(X_test)
 
+print(f"\nX_TRAIN_PREPROCESSOR {X_train_prep}") # Aplicar el ColumnTransformer devuelve un numpy array y se eliminan los nombres de las cols.
+
+
 # Convertir el output del ColumnTransformer en dataframe y añadir el nombre de las columnas
 # ------------------------------------------------------------------------------
 # Nombre de todas las columnas
 encoded_cat = preprocessor.named_transformers_['onehot'].get_feature_names_out(cat_cols)
-labels = np.concatenate([numeric_cols, encoded_cat])
+labels = np.concatenate([numeric_cols, encoded_cat]) # gracias a que hemos obtenido las columnas luego las podemos juntar con los preprocesamientos
 # Conversión a dataframe
 X_train_prep = pd.DataFrame(X_train_prep, columns=labels)
 X_test_prep = pd.DataFrame(X_test_prep, columns=labels)
@@ -69,16 +78,16 @@ max_depth = 5,
 criterion = 'gini',
 random_state = 123
 )
-# Entrenamiento del modelo
+# Entrenamiento del modelo - Decision Tree Classifier
 # ------------------------------------------------------------------------------
 modelo.fit(X_train_prep, y_train)
 
 # Estructura del árbol creado
 # ------------------------------------------------------------------------------
 fig, ax = plt.subplots(figsize=(13, 6))
-print(f"Profundidad del árbol: {modelo.get_depth()}")
-print(f"Número de nodos terminales: {modelo.get_n_leaves()}")
-print(f" {modelo._parameter_constraints}")
+print(f"\nProfundidad del árbol: {modelo.get_depth()}")
+print(f"\nNúmero de nodos terminales: {modelo.get_n_leaves()}")
+print(f"{modelo._parameter_constraints}")
 plot = plot_tree(
     decision_tree = modelo,
     feature_names = labels.tolist(),
@@ -92,40 +101,46 @@ plot = plot_tree(
 # Error de test del modelo
 #-------------------------------------------------------------------------------
 predicciones = modelo.predict(X = X_test_prep,)
-print("Matriz de confusión")
+print("\nMatriz de confusión")
 print("-------------------")
 array_confusion = confusion_matrix(
-y_true = y_test,
-y_pred = predicciones
+    y_true = y_test,
+    y_pred = predicciones
 )
 
-print(f"Matriz de confusion: {array_confusion}")
+print(f"\nMatriz de confusion: {array_confusion}")
 
 accuracy = accuracy_score(
-y_true = y_test,
-y_pred = predicciones)
-print(f"El accuracy de test es: {100 * accuracy} %")
+    y_true = y_test,
+    y_pred = predicciones)
+print(f"\nEl accuracy de test es: {100 * accuracy} %")
 
 
 # Post pruning (const complexity pruning) por validación cruzada
 # ------------------------------------------------------------------------------
 # Valores de ccp_alpha evaluados
+
+# ccp_alpha: Es el parámetro de pruning cost-complexity del árbol de
+# decisión, que controla qué partes del árbol son eliminadas para
+# simplificar la estructura.
+print(f"\nRealizando un ajuste con el parámetro ccp_alpha. El objetivo es someter a un proceso de post-poda y descubrir la profundidad adecuada")
 param_grid = {'ccp_alpha':np.linspace(0, 5, 10)}
 # Búsqueda por validación cruzada
 grid = GridSearchCV(
-# El árbol se crece al máximo posible antes de aplicar el pruning
-estimator = DecisionTreeClassifier(
-    max_depth = None,
-    min_samples_split = 2,
-    min_samples_leaf = 1,
-    random_state = 123
-),
-param_grid = param_grid,
-scoring = 'accuracy',
-cv = 10,
-refit = True,
-return_train_score = True
+    # El árbol se crece al máximo posible antes de aplicar el pruning
+    estimator = DecisionTreeClassifier(
+        max_depth = None,
+        min_samples_split = 2,
+        min_samples_leaf = 1,
+        random_state = 123
+    ),
+    param_grid = param_grid,
+    scoring = 'accuracy',
+    cv = 10,
+    refit = True,
+    return_train_score = True
 )
+print(f"\nAplicando la función fit a los conjuntos de entrenamiento para el ajuste de post-poda")
 grid.fit(X_train_prep, y_train)
 fig, ax = plt.subplots(figsize=(6, 3.84))
 scores = pd.DataFrame(grid.cv_results_)
@@ -135,18 +150,22 @@ ax.set_title("Error de validacion cruzada vs hiperparámetro ccp_alpha")
 
 # Estructura del árbol final
 # ------------------------------------------------------------------------------
+print(f"\nObteniendo el modelo final con el mejor estimador proporcionado por GridSearchCV")
+
 modelo_final = grid.best_estimator_
+
 print(f"Profundidad del árbol: {modelo_final.get_depth()}")
 print(f"Número de nodos terminales: {modelo_final.get_n_leaves()}")
 # Error de test del modelo final
 #-------------------------------------------------------------------------------
 predicciones = modelo_final.predict(X = X_test_prep)
 accuracy = accuracy_score(
-y_true = y_test,
-y_pred = predicciones)
-print(f"El accuracy de test es: {100 * accuracy} %")
+    y_true = y_test,
+    y_pred = predicciones
+)
+print(f"\nEl accuracy del modelo final es: {100 * accuracy} %")
 
-print("Importancia de los predictores en el modelo")
+print("\nImportancia de los predictores en el modelo")
 print("-------------------------------------------")
 importancia_predictores = pd.DataFrame(
 {'predictor': labels.tolist(),

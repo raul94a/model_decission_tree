@@ -3,6 +3,8 @@
 *.py[cod]
 *$py.class
 Lib/**
+share/**
+etc/**
 *.pyc
 # C extensions
 *.so
